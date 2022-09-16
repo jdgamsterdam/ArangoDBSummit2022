@@ -1,0 +1,4 @@
+/* Person as Center   */
+LET allnodes=(FOR vertex, edges IN 1..1 ANY CONCAT('movie_nodes/', @nconst) movie_edges
+	RETURN  {'data': {id: CONCAT('movie_nodes/', vertex._key)}})
+RETURN {id: @nconst, nodecount: COUNT(allnodes)}

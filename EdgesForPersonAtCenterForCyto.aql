@@ -1,0 +1,4 @@
+/* Edges For Cyto Scape  */
+FOR vertex, edges IN 1..1 ANY CONCAT('movie_nodes/', @nconst) movie_edges
+    LIMIT @myoffset, @mycount
+	RETURN  {'data': {source: edges._from, target: edges._to, job: edges.job}}

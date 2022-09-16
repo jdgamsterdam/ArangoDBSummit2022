@@ -1,0 +1,12 @@
+/* Uses LIKE Match.  More like traditional searches but slower */
+FOR name IN name_basics_primaryName_view
+	SEARCH ANALYZER(LIKE(name.primaryName, CONCAT('%',@myname,'%')), "identity")
+	LET mytitles = {nconst: name._key, primaryName: name.primaryName, kftitle: name.knownForTitles} 
+	LIMIT 10 
+	FOR all_kftitle in SPLIT(mytitles.kftitle,',')
+		FOR title in title_basics FILTER title._key == all_kftitle 
+			COLLECT nconst = name._key, myprimaryName = name.primaryName,mysim=NGRAM_SIMILARITY(name.primaryName, @myname, 3) INTO groupedTitles SORT mysim DESC LIMIT 10 
+	RETURN {nconst: nconst, primaryName: myprimaryName, KnownForTitles: SUBSTITUTE( groupedTitles[*].title.primaryTitle, ["[", "]"], "|" ), Simularity: mysim}
+	
+	
+	

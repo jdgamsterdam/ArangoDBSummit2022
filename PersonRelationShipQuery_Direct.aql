@@ -1,0 +1,10 @@
+FOR p IN 1..6 ANY K_PATHS CONCAT('name_basics/',@nconst1) TO CONCAT('name_basics/',@nconst2) GRAPH 'Movie_Graph_Direct' 
+    LIMIT 5
+    LET myName = REMOVE_VALUE(p.vertices[*].primaryName,null)
+    LET myJob = p.edges[*].job
+    LET myTitle = REMOVE_VALUE(p.vertices[*].primaryTitle,null)
+    LET numItems = count(myJob)
+    LET mywith = (numItems==2) ? (RETURN [null,'<i> in/of </i>','<i> with </i>']) : (numItems==4) ? (RETURN [null,'<i> in/of </i>','<i> with </i>',null,null,'<i> in/of </i>', '<i> with </i>']) : (RETURN [null,'<i> in/of </i>','<i> with </i>',null,null,'<i> in/of </i>', '<i> with </i>', null,null,'<i> in/of </i>','<i> with </i>' ])
+    LET NameTitle = INTERLEAVE (myName, myTitle)
+    LET NameTitleJob = INTERLEAVE (NameTitle, myJob)
+    RETURN APPEND(REMOVE_VALUE(INTERLEAVE(NameTitleJob,mywith[0]),null),'<br>')

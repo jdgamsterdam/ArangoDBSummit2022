@@ -1,0 +1,7 @@
+/*LET myCenter = CONCAT('name_basics/', @nconst)*/
+LET myCenter = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('name_basics/', @nconst)) : (RETURN CONCAT('title_basics/', @nconst))
+FOR vertex, edges IN 1..1 ANY myCenter[0] movie_edges_direct
+    LET myID = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('title_basics/', vertex._key)) : (RETURN CONCAT('name_basics/', vertex._key))
+    LET myLabel = (LEFT(@nconst,2)=='nm') ? (RETURN vertex.primaryTitle) : (RETURN vertex.primaryName)
+    LIMIT @myoffset, @mycount
+	RETURN  {'data': {id: myID[0], label: myLabel[0]}}

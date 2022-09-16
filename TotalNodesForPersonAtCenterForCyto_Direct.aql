@@ -1,0 +1,6 @@
+/* Person as Center   */
+LET myCenter = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('name_basics/', @nconst)) : (RETURN CONCAT('title_basics/', @nconst))
+LET allnodes=(FOR vertex, edges IN 1..1 ANY myCenter[0] movie_edges_direct
+    LET myID = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('title_basics/', vertex._key)) : (RETURN CONCAT('name_basics/', vertex._key))
+	RETURN  {'data': {id: myID[0]}})
+RETURN {id: @nconst, nodecount: COUNT(allnodes)}

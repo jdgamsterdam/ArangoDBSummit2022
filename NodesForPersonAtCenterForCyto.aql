@@ -1,0 +1,4 @@
+/* Person as Center   */
+FOR vertex, edges IN 1..1 ANY CONCAT('movie_nodes/', @nconst) movie_edges
+    LIMIT @myoffset, @mycount
+	RETURN  {'data': {id: CONCAT('movie_nodes/', vertex._key), label: vertex.NameOrTitle}}

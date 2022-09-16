@@ -1,0 +1,9 @@
+**/backup
+**/__pycache__
+*.tsv
+*.csv
+**/setup/env.bat
+env.py
+**/setup/mypassword.txt
+**/setup/dockersetup.bat
+**/setup/sysctl.conf

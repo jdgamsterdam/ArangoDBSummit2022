@@ -1,0 +1,4 @@
+FOR p IN 1..6 ANY K_PATHS CONCAT('movie_nodes/',@nconst1) TO CONCAT('movie_nodes/',@nconst2) GRAPH 'Movie_Graph' LIMIT 4 LET mynodes = p.vertices[*].NameOrTitle
+    LET MYPATHS = INTERLEAVE(["<br>"],mynodes,p.edges[* RETURN CONCAT(' <i>',CURRENT.job,'</i> ', '<b> in/of </b> ')])
+    FOR DOC IN MYPATHS
+        RETURN DOC

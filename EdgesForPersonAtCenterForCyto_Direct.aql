@@ -1,0 +1,5 @@
+/* Edges For Cyto Scape  */
+LET myCenter = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('name_basics/', @nconst)) : (RETURN CONCAT('title_basics/', @nconst))
+FOR vertex, edges IN 1..1 ANY myCenter[0] movie_edges_direct
+    LIMIT @myoffset, @mycount
+	RETURN  {'data': {source: edges._from, target: edges._to, job: edges.job}}
