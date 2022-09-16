@@ -1,0 +1,9 @@
+/* Edges Should always Start with Movie / Show */
+FOR doc IN title_principals 
+  INSERT {
+    _key: CONCAT(doc.tconst, doc.nconst, SUBSTITUTE(doc.category,'\\N','Unknown')),
+    _from: CONCAT('title_basics/',doc.tconst), 
+    _to: CONCAT('name_basics/',doc.nconst), 
+    job: SUBSTITUTE(doc.category,'\\N','Unknown') 
+  }
+  INTO movie_edges_direct OPTIONS { overwrite: "ignore" }

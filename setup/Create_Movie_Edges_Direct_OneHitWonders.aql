@@ -1,0 +1,18 @@
+/* Make Sure to First Create One Hit Wonders */
+/* Get Related Movies From Known for since these are not in the Title Princeples for Bit Players */
+/* Only for people with one Knownfor */
+
+FOR name IN name_basics
+    LET kftitles=SPLIT(name.knownForTitles,',')
+    FILTER COUNT(kftitles)==1
+    FOR kftitle in kftitles
+        FILTER kftitle != '\\N'
+        FOR professions in SPLIT(name.primaryProfession,',')
+            FILTER professions != null
+            let myprofession = SUBSTITUTE(professions,'\\N','Unknown')
+           INSERT {
+                _key: CONCAT(kftitle, name._key, myprofession),
+                _from: CONCAT('title_basics/',kftitle), 
+                _to: CONCAT('name_basics/',name._key), 
+                job: myprofession
+            } INTO movie_edges_direct OPTIONS { overwrite: "ignore" }

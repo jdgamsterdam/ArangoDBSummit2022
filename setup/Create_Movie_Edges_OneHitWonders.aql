@@ -1,0 +1,13 @@
+/* Make Sure to First Create One Hit Wonders */
+/* Get Related Movies From Known for since these are not in the Title Princeples for Bit Players */
+/* Only for people with one Knownfor */
+FOR name IN OneHitWonders
+    FOR professions in SPLIT(name.primaryProfession,',')
+        FILTER professions != null
+        INSERT {
+            _key: CONCAT(name.knownForTitles, name._key, SUBSTITUTE(professions,'\\N','Unknown')),
+            _from: CONCAT('movie_nodes/',name.knownForTitles), 
+            _to: CONCAT('movie_nodes/',name._key), 
+            job: SUBSTITUTE(professions,'\\N','Unknown')           
+        }
+        INTO movie_edges OPTIONS { overwrite: "ignore" }

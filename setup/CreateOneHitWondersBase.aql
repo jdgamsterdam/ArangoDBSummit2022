@@ -1,0 +1,5 @@
+FOR name IN name_basics
+    FILTER FIND_FIRST(name.knownForTitles,',') == -1
+    FILTER LEFT(name.knownForTitles, 2) == 'tt'
+    FILTER LEFT(name._key, 2) == 'nm'
+    INSERT name INTO OneHitWonders
