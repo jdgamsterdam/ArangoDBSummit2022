@@ -1,0 +1,78 @@
+
+//Get cursor Location 
+var cursorX;
+var cursorY;
+var lastrightclicklocation='none';
+
+window.addEventListener('contextmenu', (event) => {
+    cursorX = event.pageX;
+    cursorY = event.pageY;
+    lastrightclicklocation =  "x: " + cursorX + ", y: " + cursorY;
+    console.log(lastrightclicklocation)
+    hovered_node_imdb=document.getElementById("output-serverside-imdb").innerHTML;
+    console.log(hovered_node_imdb)
+    hovered_node_wiki=document.getElementById("output-serverside-title").innerHTML;
+    openxdialog(hovered_node_imdb,hovered_node_wiki)
+    event.preventDefault(); 
+    })
+   
+function MousePos() {
+    texttoprint =  "x: " + cursorX + ", y: " + cursorY ;
+    return(texttoprint)
+}
+
+//if(!window.dash_clientside) {window.dash_clientside = {};}
+//window.dash_clientside.clientside = {
+//    display: function (value) {
+//        return 'Client says "' + value + '"' + 'Current Mouse Pos' + MousePos() + 'Last Right Click Pos' +lastrightclicklocation;
+//    }
+//}
+
+function openxdialog(myimdb,mytitle) {
+
+    // Get everything after the Wiki Search URL
+    basebody= '\
+    <style>\
+        .demo1-mb-1 { margin-bottom: 1em; }\
+        .demo1-row { text-align: center; }\
+        .demo1-row label { min-width: 6em; display: inline-block; text-align: right; margin-right: 0.5em; }\
+        .demo1-row input { padding: 0.3em; outline: none; min-width: 12em; }\
+        .demo1-validated input { border: green 2px solid; }\
+        .demo1-validated input:invalid { border: red 2px solid; }\
+    </style>\
+    <table width="100%" border="1">\
+    <tbody>\
+      <tr>\
+        <td style="width: 90%"><a href="https://www.imdb.com/MYIMDB" target="_blank">IMDB For Actor or Title</a></td>\
+        <td style="width: 10%"><img src="assets/IMDB_Logo_2016.svg" alt="IMDB" title="IMDB"\
+            style="height: 60px;"><br>\
+        </td>\
+      </tr>\
+      <tr>\
+        <td style="width: 90%"><a href="https://en.wikipedia.org/w/index.php?search=MYWIKISEARCH" target="_blank">Search Wikipedia</a></td>\
+        <td style="width: 10%"><img src="assets/Wikipedia_logo.svg" alt="Wikipedia" title="Wikipedia"\
+            style="height: 60px;"><br>\
+        </td>\
+      </tr>\
+    </tbody>\
+  </table>'
+
+
+    finalbody=basebody.replace("MYWIKISEARCH", mytitle); 
+    //Replace name or Title
+
+   
+    if (myimdb.substring(0, 2)=='nm') {
+        finalbody=finalbody.replace("MYIMDB", 'name/'+myimdb); 
+    }
+    else {
+        finalbody=finalbody.replace("MYIMDB", 'title/'+myimdb); 
+    }
+    xdialog.open({
+        title: mytitle,
+        body: finalbody,
+        buttons: { ok: 'Close' },
+        effect: '3d_rotate_bottom',
+        style: 'width: 25em;',
+    });
+  }
