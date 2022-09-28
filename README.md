@@ -16,9 +16,9 @@ I have a script for creating and (making some small fixes) to the ArangoDB docke
 I have created the Database (and Programs and Queries) in two different ways. These can be switched by uncommenting the different queries in the movies_arango_cytoscape_nojs.py:  
 
     1. The first way creates a special collection of Nodes for Both Shows/Movies and People in One "Vertex" Collection called Movie_Nodes and creates Edges to and from that one collection.
-      **Advantage:** It makes the Python and some queries a bit simpler as you don't have to worry whether the "center" node that you are looking at in a display is a Show or a Person, since they both come from the same movie_nodes collection.
+      Advantage: It makes the Python and some queries a bit simpler as you don't have to worry whether the "center" node that you are looking at in a display is a Show or a Person, since they both come from the same movie_nodes collection.
     2. The Second way (with queries and collections ending in/Containing "Direct") uses the "title_basics" (Shows) and "name_basics" (People) as is and creates Edges between the two collection
-      **Advantage:** You don't have to create a new movie_nodes collection and, you have access to other Objects in the title_basics and name_basics collections (e.g. birthYear in Name basics) without having to do the AQL equivalent of a Join to get that information.
+      Advantage: You don't have to create a new movie_nodes collection and, you have access to other Objects in the title_basics and name_basics collections (e.g. birthYear in Name basics) without having to do the AQL equivalent of a Join to get that information.
     3. A Third way (which I did not do) is, when creating the Database initially, load all the name_basics and title_basics directly into the movie_nodes file. While this would not work in a traditional RDBMS since the objects of these to collections are different, but this should work fine in ArangoDB.
 
 Additionally, the file movies_arango_cytoscape_gc.py uses an intermediate google cloud function to query the database. This is because my ArangoDatabase is on an IPv6 network behind a firewall and certain systems only support IPv4 and the Google Cloud function acts as bridge between the two type of networks.
