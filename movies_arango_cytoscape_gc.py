@@ -1,8 +1,6 @@
 from dash import dash_table, dcc, html, Input, Output, State, ctx
-from arango import ArangoClient
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, DashProxy, Input, MultiplexerTransform, html
-from pynput import mouse
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 import dash_daq as daq
@@ -10,7 +8,7 @@ import json as json
 import pandas as pd
 import bs4 as bs
 import re as re
-import dash,json,math
+import dash,json,math,requests,ast
 
 #Get Environment Variables from Seperate file
 from importlib.machinery import SourceFileLoader
@@ -92,15 +90,16 @@ person1nconst = 'nm0000102'
 person2Name = 'Sissy Spacek'
 person2nconst = 'nm0000651'
 
+#InitialCenterNode=[ {'data': {'id': 'movie_nodes/'+person1nconst, 'label': person1Name}} ]
 InitialCenterNode=[ {'data': {'id': 'name_basics/'+person1nconst, 'label': person1Name}} ]
 
 CenterNode=InitialCenterNode
 
 # Setup Database Connection
 
-client = ArangoClient(hosts=env.MYHOST)
+#client = ArangoClient(hosts=env.MYHOST)
 # Connect to the database.
-db = client.db('Movies', username=env.MYUSERNAME, password=env.MYPASSWORD)
+#db = client.db('Movies', username=env.MYUSERNAME, password=env.MYPASSWORD)
 
 # Query- For KnownForTitles Need to group and substitute to convert that field to plain text or will screw up the table
 # Also the order of the Filter Sort and LIMIT is very important 
@@ -120,31 +119,34 @@ NodesForPersonAtCenterForCyto=getQuery("./NodesForPersonAtCenterForCyto_Direct.a
 #EdgesForPersonAtCenterForCyto=getQuery("./EdgesForPersonAtCenterForCyto.aql")
 EdgesForPersonAtCenterForCyto=getQuery("./EdgesForPersonAtCenterForCyto_Direct.aql")
 #TotalNodesForPersonAtCenterForCyto=getQuery("./TotalNodesForPersonAtCenterForCyto.aql")     
-TotalNodesForPersonAtCenterForCyto=getQuery("./TotalNodesForPersonAtCenterForCyto_Direct.aql") 
-def run_query(QueryText, my_bind_vars={}):
-  #Setup Query API Wrapper
-  myaql = db.aql
-  #As we know it will be a small query we can make the batch size 1
-  mycursor = myaql.execute(QueryText,bind_vars=my_bind_vars, batch_size=1)
+TotalNodesForPersonAtCenterForCyto=getQuery("./TotalNodesForPersonAtCenterForCyto_Direct.aql")
 
-  #Convert the Results to a Python List object
-  mylist_fromarango = [doc for doc in mycursor]
 
-  #Return List Object 
-  return mylist_fromarango
+
+def run_cloud_query(QueryText, my_bind_vars={}):
+    cloud_function_address=env.CLOUDFUNCTIONADDRESS
+    #Convert Bind Vars to Text
+    my_bind_vars_text=repr(my_bind_vars)
+    gcparams = {'AQL':QueryText,'BindVars':my_bind_vars_text}
+    r = requests.post(cloud_function_address,params=gcparams)
+    #Return List Object 
+    mydict=ast.literal_eval(r.text)  
+    return(mydict)
+
 
 def get_text_results_for_name(movie_person_name):
+
     #Set Default Name
     if movie_person_name==None:
         movie_person_name=person1Name
     name_query_bind_vars={'myname': movie_person_name}
-    movies_query = run_query(MoviesPersonsQuery,name_query_bind_vars)
-    return(movies_query)
+    movies_cloud_query = run_cloud_query(MoviesPersonsQuery,name_query_bind_vars)
+    return(movies_cloud_query)
 
 
 def get_relationships(person1nconst,person2nconst):
     name_query_bind_vars={'nconst1': person1nconst,'nconst2': person2nconst}
-    relationship_query = run_query(PersonRelationshipQuery,name_query_bind_vars)
+    relationship_query = run_cloud_query(PersonRelationshipQuery,name_query_bind_vars)
     return(relationship_query)
 
 #Initial Setup
@@ -153,81 +155,32 @@ myoffset=0
 total_return_nodes=20
 pagenumber=1
 node_query_bind_vars={'nconst': person1nconst, 'myoffset': myoffset, 'mycount': maxnodespergraph }
-nodes = run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
-nodes=nodes+CenterNode
+query_nodes = run_cloud_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+nodes=query_nodes+CenterNode
 all_layout_types=['random','grid','circle','concentric','breadthfirst','cose']
 initial_layout_type='circle'
 all_node_shapes=['rectangle', 'roundrectangle', 'round-rectangle', 'cutrectangle', 'cut-rectangle', 'bottomroundrectangle', 'bottom-round-rectangle', 'barrel', 'ellipse', 'triangle', 'round-triangle', 'square', 'pentagon', 'round-pentagon', 'hexagon', 'round-hexagon', 'concavehexagon', 'concave-hexagon', 'heptagon', 'round-heptagon', 'octagon', 'round-octagon', 'tag', 'round-tag', 'star', 'diamond', 'round-diamond', 'vee', 'rhomboid', 'polygon']
 initial_title_node_shape='ellipse'
 initial_name_node_shape='square'
-
 edge_query_bind_vars={'nconst': person1nconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
-edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+edges = run_cloud_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
 
-    #Get Initial Dropdown Elements
+#Get Initial Dropdown Elements
 baseresults=get_text_results_for_name(person1Name)
+
+#For Cloud Query need to Return as Text for the dataframe to Work
 dropdownelements = [{"label": doc["primaryName"]+'-'+doc["nconst"], "value": doc["nconst"]} for doc in baseresults]
 initial_dropdownelement = dropdownelements[0]["value"]
 
-    #Show Initial Table
-    #Convert Results to a Dataframe to show in a Dash Table
+#Show Initial Table
+#Convert Results to a Dataframe to show in a Dash Table
 df = pd.DataFrame(baseresults)
 myinitialtable=dash_table.DataTable(df.to_dict('records'), [{"name": i, "id": i} for i in df.columns])
 
 #Layout
 app = DashProxy(transforms=[MultiplexerTransform()],external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = html.Div([
-    dbc.Modal(
-        [      
-            dbc.ModalHeader(dbc.ModalTitle("Header"), id="right-modal-header"),
-            dbc.ModalBody(id="right-modal-body-total", children=[
-                html.Div(id="right-modal-body"),
-                html.Div([
-                    html.A([
-                        html.Img(
-                            src='assets/IMDB_Logo_2016.svg',
-                            style={
-                                'height' : '50px',
-                                'float' : 'center',
-                                'position': 'relative',
-                                'left': '33%',
-                                'padding-top' : 0,
-                                'padding-right' : 0
-                            })
-                        ], 
-                        href='https://www.imdb.com',
-                        id='imageurl_imdb',
-                        target='_blank'),
-                    html.Br(),
-                    html.Br(),
-                    html.A([
-                        html.Img(
-                            src='assets/Wikipedia_logo.svg',
-                            style={
-                                'height' : '50px',
-                                'float' : 'center',
-                                'position': 'relative',
-                                'left': '40%',
-                                'padding-top' : 0,
-                                'padding-right' : 0
-                            })
-                        ], 
-                        href='https://www.wikipedia',
-                        id='imageurl_wiki',
-                        target='_blank')                      
-                ])
-            ]),
-            dbc.ModalFooter(
-                dbc.Button(
-                    "Close", id="rightclose", className="ms-auto", n_clicks=0
-                )
-            ),
-        ],
-        id="right-modal",
-        is_open=False,
-        className="modal-sm"
-        ),
-    html.Table(
+     html.Table(
         id='selection-table', 
         className='mytable',
         children = 
@@ -271,7 +224,7 @@ app.layout = html.Div([
                 ])   
               ] 
              )
-         ]),
+         ]),       
     html.Div(id='cytorow', children=[
         html.P("Selected Node:"),
         html.Div(id='container-add-person'),
@@ -297,6 +250,8 @@ app.layout = html.Div([
     	    daq.ColorPicker(id='name-node-color-picker',label='Select Name Node Color',value=dict(hex='#119DFF'),style=default_inline),
             daq.ColorPicker(id='edge-color-picker',label='Select Edge Color',value=dict(hex='#119DFF'),style=default_inline)
             ]),
+        html.Div('Initial IMDB',id='output-serverside-imdb'),
+        html.Div('Initial Wiki',id='output-serverside-title'),
         cyto.Cytoscape(
             id='cytoscape1',
             elements=edges+nodes,
@@ -307,6 +262,8 @@ app.layout = html.Div([
         ]
     )
 ])
+
+
 
 # The call back and related update_output need to be in sequence 
 
@@ -401,17 +358,16 @@ def update_output_dropdown1(value,options):
                 break
             else:
                 label= "NONE"
-
         #Since This is Coming From Drop Down it is always going to be name_basics in new system
         new_CenterNode=[ {'data': {'id': 'name_basics/'+value, 'label': label}} ]
         #Run Query - For Nodes we can use the query for both Person and Title Centered
-        new_nodes = run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+        new_nodes = run_cloud_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
         #Get the total nodes return to update the page list
-        total_return_nodes_json = run_query(TotalNodesForPersonAtCenterForCyto,total_node_query_bind_vars)
+        total_return_nodes_json = run_cloud_query(TotalNodesForPersonAtCenterForCyto,total_node_query_bind_vars)
         total_return_nodes=total_return_nodes_json[0]['nodecount']
         maxpages=math.ceil(total_return_nodes/maxnodespergraph)
         new_nodes=new_nodes+new_CenterNode 
-        new_edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+        new_edges = run_cloud_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
 
     return new_edges+new_nodes,total_return_nodes,maxpages
 
@@ -471,16 +427,17 @@ def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage):
         new_CenterNode=[ {'data': {'id': myID, 'label': label}} ]
 
         #Run Query - For Nodes we can use the query for both Person and Title Centered
-        new_nodes = run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+        new_nodes = run_cloud_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
         #Get the total nodes return to update the page list
         total_node_query_bind_vars={'nconst': ClickedNodeID }
-        total_return_nodes_json = run_query(TotalNodesForPersonAtCenterForCyto,total_node_query_bind_vars)
+        total_return_nodes_json = run_cloud_query(TotalNodesForPersonAtCenterForCyto,total_node_query_bind_vars)
         total_return_nodes=total_return_nodes_json[0]['nodecount']
         maxpages=math.ceil(total_return_nodes/maxnodespergraph)
 
         new_nodes=new_nodes+new_CenterNode 
-        new_edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+        new_edges = run_cloud_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
     return new_edges+new_nodes,ClickedNode,total_return_nodes,maxpages,pagenumber
+
 
 #Add Person to Relation Test
 @app.callback(
@@ -516,55 +473,22 @@ def update_output(n_clicks,n_clicks2,value):
     return myreturns
 
 #Callback to get context menu on Cytoscape
+# For Javscript Just update the Div with the data
 
 @app.callback(
-    Output("right-modal", "is_open"),
-    Output('right-modal-body', 'children'),
-    Output('right-modal-header', 'children'), 
-    Output("rightclose", "n_clicks"),
-    Output("imageurl_imdb", "href"),
-    Output("imageurl_wiki", "href"),
-    [Input("rightclose", "n_clicks")],
-    [State("right-modal", "is_open")],
+    Output('output-serverside-imdb', 'children'),
+    Output('output-serverside-title', 'children'), 
     Input('cytoscape1', 'mouseoverNodeData')
 )
-def toggle_modal(close_button, is_open,mouseoverData):
-    mouseoverid='nm0000102'
-    RightClicktext='My Text'
-    RightClickheader='My Header'
-    imdbpage='IMDB Page'
-    wikipage='Wikipage'
-    ButtonClicked='None'
+def toggle_modal(mouseoverData):
     if mouseoverData!=None:
         #get nconst from id
         mouseoverid=mouseoverData['id'].split("/")[1]
-        #Add title or name 
-        if mouseoverid[0:2]=='tt':
-           mouseoverid='title/'+mouseoverid 
-        else:
-           mouseoverid='name/'+mouseoverid
-        #Check to see if right click    
-        with mouse.Events() as events:
-            for myevent in events:
-                if myevent.__class__.__name__=='Click':
-                    if myevent.button.value==(16,8,0):
-                        #Right
-                        ButtonClicked='Right'
-                        RightClicktext=json.dumps(mouseoverData)
-                        RightClickheader=mouseoverData['label']
-                    if myevent.button.value==(4,2,0):
-                        #Left
-                        ButtonClicked='Left'
-                    break
-
-    #Get information for modal menu            
-    imdbpage='https://www.imdb.com/'+mouseoverid    
-    wikipage='https://en.wikipedia.org/w/index.php?search='+RightClickheader
-    #Make this nothing except for testing
-    RightClicktext=''
-    if close_button or (ButtonClicked=='Right'):
-           return not is_open,RightClicktext,RightClickheader,0,imdbpage,wikipage
-    return is_open,RightClicktext,RightClickheader,0,imdbpage,wikipage
+        RightClickheader=mouseoverData['label']
+    else:
+        mouseoverid='nm0000102'
+        RightClickheader='MyHeader'
+    return mouseoverid,RightClickheader
 
 #For The Relationship between 2 People
 @app.callback(
@@ -577,7 +501,7 @@ def toggle_modal(close_button, is_open,mouseoverData):
 def update_output(n_clicks,value1,value2):
     relationship_results=get_relationships(value1,value2)
     #Add Everything to one line and then use BR tag to show different lines
-    relationship_results_text = '' 
+    relationship_results_text = ''
     for doc in relationship_results:
         results_text=repr(doc) 
         relationship_results_text = relationship_results_text  + results_text
