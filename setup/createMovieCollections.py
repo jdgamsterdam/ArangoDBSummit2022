@@ -37,6 +37,8 @@ def createGraph(GraphName):
 
 # Each Create is a separate Function so they can be easily commented out
 
+
+
 #Create and update movie Nodes 
 
 def CreateMovieNodes():
@@ -61,13 +63,10 @@ def CreateMovieNodes():
     myjobs=[mytitles,mynames]
     return(myjobs) 
 
-#Comment out to not run
-
 
 #create Movie Edges
 def CreateMovieEdges():
     createEdgeCollections('movie_edges')
-
     #Create Edges 
     file_pointer = open("./Create_Movie_Edges.aql", "r")
     createMovieEdgesQuery = file_pointer.read()
@@ -75,6 +74,19 @@ def CreateMovieEdges():
     edges_async_db = db.begin_async_execution(return_result=True)
     async_aql_edges = edges_async_db.aql   
     myedgejob = async_aql_edges.execute(createMovieEdgesQuery)
+
+
+#create Movie Edges Direct
+def CreateMovieEdgesDirect():
+    createEdgeCollections('movie_edges_direct')
+    #Create Edges 
+    file_pointer = open("./Create_Movie_Edges_Direct.aql", "r")
+    createMovieEdgesQuery = file_pointer.read()
+    file_pointer.close
+    edges_async_db = db.begin_async_execution(return_result=True)
+    async_aql_edges = edges_async_db.aql   
+    myedgejob = async_aql_edges.execute(createMovieEdgesQuery)
+    return(myedgejob)
 
 
 def Create_OneHitWonders():
@@ -98,7 +110,16 @@ def Create_OneHitWonders_edges():
     myedgejob_onehit = async_aql_edges_onehit.execute(createMovieEdgesQuery_onehit)
     return(myedgejob_onehit) 
 
-onehitedgecollection_job=Create_OneHitWonders_edges()
+def Create_OneHitWonders_Direct_edges():
+    #Add One hit wonders "movie_edges_direct" 
+    file_pointer = open("./Create_Movie_Edges_Direct_OneHitWonders.aql", "r")
+    createMovieEdgesQuery_onehit= file_pointer.read()
+    file_pointer.close
+    edges_async_db_onehit = db.begin_async_execution(return_result=True)
+    async_aql_edges_onehit = edges_async_db_onehit.aql
+    myedgejob_onehit = async_aql_edges_onehit.execute(createMovieEdgesQuery_onehit)
+    return(myedgejob_onehit) 
+
 
 def createMovieGraph(GraphName):
     if db.has_graph(GraphName):
@@ -113,3 +134,30 @@ def createMovieGraph(GraphName):
             to_vertex_collections=['movie_nodes']
         )
     return(allnodes)  
+
+def createMovieGraph_Direct(GraphName):
+    if db.has_graph(GraphName):
+        db.delete_graph(GraphName)
+        moviegraph = db.create_graph(GraphName)
+    else:
+        moviegraph = db.create_graph(GraphName)
+
+    allnodes = moviegraph.create_edge_definition(
+            edge_collection='movie_edges_direct',
+            from_vertex_collections=['title_basics'],
+            to_vertex_collections=['name_basics']
+        )
+    return(allnodes)  
+
+
+#All Steps to Create after importing the base Data
+
+#1 Create Direct Edge File 
+
+createDirectEdge_job=CreateMovieEdgesDirect()
+
+#2 Add One Hit Wonders to Edge File
+createOneHitDirectEdge_job=Create_OneHitWonders_Direct_edges()
+
+#3 Greate Graph
+createMovieGraph_job=createMovieGraph_Direct('Movie_Graph_Direct')
