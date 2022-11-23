@@ -1,5 +1,11 @@
 /* Edges For Cyto Scape  */
-LET myCenter = (LEFT(@nconst,2)=='nm') ? (RETURN CONCAT('name_basics/', @nconst)) : (RETURN CONCAT('title_basics/', @nconst))
-FOR vertex, edges IN 1..1 ANY myCenter[0] movie_edges_direct
-    LIMIT @myoffset, @mycount
-	RETURN  {'data': {source: edges._from, target: edges._to, job: edges.job}}
+LET myedges = SPLIT(@nconst,',')
+    FOR edge IN myedges
+        LET alledges=(
+            LET myCenter = (LEFT(edge,2)=='nm') ? (RETURN CONCAT('name_basics/', edge)) : (RETURN CONCAT('title_basics/', edge))
+            FOR vertex, edges IN 1..1 ANY myCenter[0] movie_edges_direct
+            LIMIT @myoffset, @mycount
+	        RETURN  {'data': {source: edges._from, target: edges._to, job: edges.job}}
+	    )
+	FOR eachedge in alledges
+	    RETURN eachedge

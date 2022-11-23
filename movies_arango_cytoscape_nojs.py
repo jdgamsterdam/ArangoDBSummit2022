@@ -1,19 +1,21 @@
-from dash import dash_table, dcc, html, Input, Output, State, ctx
-from arango import ArangoClient
-from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Output, DashProxy, Input, MultiplexerTransform, html
-from pynput import mouse
+import json
+import json as json
+import math
+import re as re
+#Get Environment Variables from Seperate file
+from importlib.machinery import SourceFileLoader
+
+import bs4 as bs
+import dash
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 import dash_daq as daq
-import json as json
 import pandas as pd
-import bs4 as bs
-import re as re
-import dash,json,math
-
-#Get Environment Variables from Seperate file
-from importlib.machinery import SourceFileLoader
+from arango import ArangoClient
+from dash import Input, Output, State, ctx, dash_table, dcc, html
+from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import (DashProxy, Input, MultiplexerTransform, Output, html)
+from pynput import mouse
 
 # imports the module from the given path
 env = SourceFileLoader("main", "setup/env.py").load_module()
@@ -93,7 +95,6 @@ person2Name = 'Sissy Spacek'
 person2nconst = 'nm0000651'
 
 InitialCenterNode=[ {'data': {'id': 'name_basics/'+person1nconst, 'label': person1Name}} ]
-
 CenterNode=InitialCenterNode
 
 # Setup Database Connection
@@ -106,7 +107,6 @@ db = client.db('Movies', username=env.MYUSERNAME, password=env.MYPASSWORD)
 # Also the order of the Filter Sort and LIMIT is very important 
 
 def getQuery(queryfile):
-
     file_pointer = open(queryfile, "r")
     createTitleNodeQuery = file_pointer.read()
     file_pointer.close
@@ -116,6 +116,8 @@ MoviesPersonsQuery=getQuery("./MoviesPersonsQuery_lev.aql")
 #PersonRelationshipQuery=getQuery("./PersonRelationshipQuery.aql")
 PersonRelationshipQuery=getQuery("./PersonRelationshipQuery_Direct.aql")
 #NodesForPersonAtCenterForCyto=getQuery("./NodesForPersonAtCenterForCyto.aql")
+
+#Nodes and Edges Queries Now accept a comma seperated list of starting points
 NodesForPersonAtCenterForCyto=getQuery("./NodesForPersonAtCenterForCyto_Direct.aql")
 #EdgesForPersonAtCenterForCyto=getQuery("./EdgesForPersonAtCenterForCyto.aql")
 EdgesForPersonAtCenterForCyto=getQuery("./EdgesForPersonAtCenterForCyto_Direct.aql")
@@ -126,10 +128,8 @@ def run_query(QueryText, my_bind_vars={}):
   myaql = db.aql
   #As we know it will be a small query we can make the batch size 1
   mycursor = myaql.execute(QueryText,bind_vars=my_bind_vars, batch_size=1)
-
   #Convert the Results to a Python List object
   mylist_fromarango = [doc for doc in mycursor]
-
   #Return List Object 
   return mylist_fromarango
 
@@ -141,28 +141,50 @@ def get_text_results_for_name(movie_person_name):
     movies_query = run_query(MoviesPersonsQuery,name_query_bind_vars)
     return(movies_query)
 
-
 def get_relationships(person1nconst,person2nconst):
     name_query_bind_vars={'nconst1': person1nconst,'nconst2': person2nconst}
     relationship_query = run_query(PersonRelationshipQuery,name_query_bind_vars)
     return(relationship_query)
 
-#Initial Setup
-maxnodespergraph=10
+#Initial Graph Setup
+maxnodespergraph=4
+clustersonpage=2
 myoffset=0
-total_return_nodes=20
+total_return_nodes=10
 pagenumber=1
-node_query_bind_vars={'nconst': person1nconst, 'myoffset': myoffset, 'mycount': maxnodespergraph }
-nodes = run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
-nodes=nodes+CenterNode
+
+#Initial Setup. Number of Clusters don't need to loop but is good to test. 
+
+node_query_bind_vars={'nconst': person1nconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
+nodes = run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)+CenterNode
+
+edge_query_bind_vars={'nconst': person1nconst,'myoffset': myoffset, 'mycount': maxnodespergraph}
+edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+
+for i in range(1,clustersonpage):
+    allnodes=nodes
+    alledges=edges
+    #Setup all nodes
+    for node in nodes:
+        #This is the new Center Node
+        newnconst=node['data']['id'].split("/")[1]
+        node_query_bind_vars={'nconst': newnconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
+        newnodes=run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+        allnodes=allnodes+newnodes
+    nodes=allnodes
+    for edge in edges:
+        #This is the new Center Node
+        newnconst=edge['data']['source'].split("/")[1]
+        edge_query_bind_vars={'nconst': newnconst,'myoffset': myoffset, 'mycount': maxnodespergraph}
+        newedges=run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+        alledges=alledges+newedges
+    edges=alledges
+
 all_layout_types=['random','grid','circle','concentric','breadthfirst','cose']
-initial_layout_type='circle'
+initial_layout_type='breadthfirst'
 all_node_shapes=['rectangle', 'roundrectangle', 'round-rectangle', 'cutrectangle', 'cut-rectangle', 'bottomroundrectangle', 'bottom-round-rectangle', 'barrel', 'ellipse', 'triangle', 'round-triangle', 'square', 'pentagon', 'round-pentagon', 'hexagon', 'round-hexagon', 'concavehexagon', 'concave-hexagon', 'heptagon', 'round-heptagon', 'octagon', 'round-octagon', 'tag', 'round-tag', 'star', 'diamond', 'round-diamond', 'vee', 'rhomboid', 'polygon']
 initial_title_node_shape='ellipse'
 initial_name_node_shape='square'
-
-edge_query_bind_vars={'nconst': person1nconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
-edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
 
     #Get Initial Dropdown Elements
 baseresults=get_text_results_for_name(person1Name)
@@ -276,10 +298,12 @@ app.layout = html.Div([
         html.P("Selected Node:"),
         html.Div(id='container-add-person'),
         html.Div(children=[
-            html.Button('Add as Node 1', id='submit-person1', n_clicks=0), 
-            html.Button('Add as Node 2', id='submit-person2', n_clicks=0), 
+            html.Button('Add as Node 1', id='submit-person1', n_clicks=0),
+            html.Button('Add as Node 2', id='submit-person2', n_clicks=0),
             html.P("Total Connected Nodes: ", style={'display':'inline-block'}),
             html.Div(id='total-return-nodes',style={'display':'inline-block'}),
+            html.P("Clusters: ", style={'display':'inline-block', 'padding-left': '20px'}),
+            dcc.Input(id="clusters-on-page", type="number",debounce=False, placeholder=1, value=clustersonpage, min=1, max=25, step=1, style={'display':'inline-block', 'padding-left': '20px'}),
             html.P(" Nodes on Page: ", style={'display':'inline-block', 'padding-left': '20px'}),
             dcc.Input(id="nodes-on-page", type="number",debounce=False, placeholder=1, value=maxnodespergraph, min=1, max=25, step=1, style={'display':'inline-block', 'padding-left': '20px'}),
             html.P(" Current Page Number: ", style={'display':'inline-block', 'padding-left': '20px'}),
@@ -413,6 +437,32 @@ def update_output_dropdown1(value,options):
         new_nodes=new_nodes+new_CenterNode 
         new_edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
 
+        for i in range(1,clustersonpage):
+            allnodes=new_nodes
+            alledges=new_edges
+            #Setup all nodes
+            newnconst=''
+            for node in new_nodes:
+                #This is the new Center Node. Create all elements in comma seperated list to query
+                splitnconst=node['data']['id'].split("/")[1]
+                newnconst=newnconst+','+splitnconst
+            #Get rid of initial comma
+            newnconst=newnconst[1:]    
+            node_query_bind_vars={'nconst': newnconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
+            newnodes=run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+            allnodes=allnodes+newnodes
+            new_nodes=allnodes
+            for edge in new_edges:
+                #This is the new Center Node
+                splitnconst=edge['data']['source'].split("/")[1]
+                newnconst=newnconst+','+splitnconst
+            #Get rid of initial comma
+            newnconst=newnconst[1:]
+            edge_query_bind_vars={'nconst': newnconst,'myoffset': myoffset, 'mycount': maxnodespergraph}
+            newedges=run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+            alledges=alledges+newedges
+            new_edges=alledges
+  
     return new_edges+new_nodes,total_return_nodes,maxpages
 
 #Left On Cytoscape Click
@@ -426,9 +476,10 @@ def update_output_dropdown1(value,options):
     Input('cytoscape1', 'tapNodeData'),
     Input('page-number', 'value'),
     Input('container-add-person', 'children'),
-    Input('nodes-on-page', 'value')
+    Input('nodes-on-page', 'value'),
+    Input('clusters-on-page', 'value')
 )
-def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage):
+def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage,clustersonpage):
     #Update Cyto graph
     if (not tapNodeData) and (not mypagenumber) and (not nodesonpage):
         raise PreventUpdate() 
@@ -438,7 +489,6 @@ def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage):
             #Means nothing was selected so go to last selection and update page number
             label=person1Name
             ClickedNodeID=person1nconst
-            #myID="movie_nodes/"+ClickedNodeID
             #Since This is a Click need to Figure out if a Name or Film
             if ClickedNodeID[0:2]=='nm':
                 myID="name_basics/"+ClickedNodeID
@@ -449,7 +499,7 @@ def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage):
         else:
             ClickedNode=json.dumps(tapNodeData, indent=2)
             ClickedNodeID=tapNodeData['id'].split("/")[1]
-            label=tapNodeData['label']
+            label=tapNodeData['label']+" "+ClickedNodeID
 
         #Set Page number if Clicked Node Not Equal to Current Node
  
@@ -480,6 +530,34 @@ def update_output_click1(tapNodeData,mypagenumber,LastNode,nodesonpage):
 
         new_nodes=new_nodes+new_CenterNode 
         new_edges = run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+
+        for i in range(1,clustersonpage):
+            allnodes=new_nodes
+            alledges=new_edges
+            #Setup all nodes
+            newnconst=''
+            for node in new_nodes:
+                #This is the new Center Node. Create all elements in comma seperated list to query
+                splitnconst=node['data']['id'].split("/")[1]
+                newnconst=newnconst+','+splitnconst
+            #Get rid of initial comma
+            newnconst=newnconst[1:]
+            node_query_bind_vars={'nconst': newnconst, 'myoffset': myoffset, 'mycount': maxnodespergraph}
+            newnodes=run_query(NodesForPersonAtCenterForCyto,node_query_bind_vars)
+            allnodes=allnodes+newnodes
+            new_nodes=allnodes
+            for edge in new_edges:
+                #This is the new Center Node
+                splitnconst=edge['data']['source'].split("/")[1]
+                newnconst=newnconst+','+splitnconst
+            #Get rid of initial comma
+            newnconst=newnconst[1:]
+            edge_query_bind_vars={'nconst': newnconst,'myoffset': myoffset, 'mycount': maxnodespergraph}
+            newedges=run_query(EdgesForPersonAtCenterForCyto,edge_query_bind_vars)
+            alledges=alledges+newedges
+            #print(alledges)
+            new_edges=alledges
+
     return new_edges+new_nodes,ClickedNode,total_return_nodes,maxpages,pagenumber
 
 #Add Person to Relation Test
